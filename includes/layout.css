@@ -1,0 +1,130 @@
+@font-face {
+    font-family: 'Vazir';
+    src: url('../assets/Vazir.ttf') format('truetype');
+    font-weight: normal;
+    font-style: normal;
+}
+
+body {
+    background-color: #fff9e6;
+    margin: 0;
+    font-family: 'Vazir', sans-serif;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    overflow-y: auto;
+
+   
+    
+}
+
+
+.topbar {
+    background: linear-gradient(90deg, #ffd27f, #ffb84d);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 5px 10px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    gap: 5px;
+    position: relative;
+    z-index: 10;
+}
+.topbar h1 {
+    margin: 0 auto; 
+    font-size: 20px;
+    color: #333;
+    user-select: none;
+}
+.topbar .logout-btn img {
+    width: 40px;   
+    height: 40px;
+    cursor: pointer;
+}
+.topbar .menu-toggle {
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+}
+.topbar .menu-toggle img {
+    width: 32px;
+    height: 32px;
+}
+
+
+.page {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+}
+
+
+.sidebar {
+    background: linear-gradient(180deg, #ffd27f, #ffb84d);
+    width: 240px;
+    transition: width 0.3s ease;
+    overflow-y: auto; 
+    overflow-x: hidden;
+    display: flex;
+    flex-direction: column;
+    height: calc(100vh - 52px); 
+    position: fixed;
+    top: 52px;
+    right: 0;
+    box-shadow: inset -2px 0 4px rgba(0,0,0,0.05);
+    z-index: 5;
+}
+.sidebar.collapsed {
+    width: 8px; 
+    overflow: visible;
+}
+.sidebar.collapsed a {
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+}
+.sidebar a {
+    padding: 12px 15px;
+    text-decoration: none;
+    color: #333;
+    font-size: 15px;
+    border-bottom: 1px solid rgba(0,0,0,0.05);
+    transition: background 0.2s, opacity 0.3s ease;
+    white-space: nowrap;
+}
+.sidebar a:hover {
+    background: rgba(255,255,255,0.2);
+}
+
+
+.content {
+    margin-right: 240px;
+    padding: 20px;
+    flex: 1;
+    transition: margin-right 0.3s ease;
+    min-height: calc(100vh - 52px);
+    overflow-y: auto; 
+}
+.sidebar.collapsed ~ .content {
+    margin-right: 8px;
+}
+
+
+@media screen and (max-width: 768px) {
+    .sidebar {
+        position: fixed;
+        height: 100vh;
+        top: 0;
+        width: 240px;
+        z-index: 100;
+        transform: translateX(100%);
+        transition: transform 0.3s ease;
+    }
+    .sidebar.collapsed {
+        transform: translateX(0);
+        width: 240px;
+    }
+    .content {
+        margin-right: 0;
+    }
+}
