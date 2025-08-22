@@ -82,7 +82,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                        if ($chkBoard->fetchColumn() == 0) {
                         throw new Exception('برد انتخاب‌شده معتبر نیست.');
                     }
-
+                    $chkDuplicate = $pdo->prepare("
+                        SELECT COUNT(*) 
+                        FROM tasks 
+                        WHERE board_id = ? AND name = ? AND id <> ?
+                    ");
+                    $chkDuplicate->execute([$newBoardId, $tName, $task_id]);
+                    if ($chkDuplicate->fetchColumn() > 0) {
+                        throw new Exception('در این برد نمی‌توانید دو تسک با نام یکسان داشته باشید.');
+                    }
                     $pdo->prepare("UPDATE tasks SET name = ?, description = ?, status = ?, board_id = ? 
                     WHERE id = ? AND project_id = ?")
                     ->execute([$tName, $tDesc, $tStatus, $newBoardId, $task_id, $project_id]);
