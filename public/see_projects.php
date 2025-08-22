@@ -76,8 +76,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $chkT->execute([$board_id, $tName, $task_id]);
                         if ($chkT->fetchColumn() > 0) throw new Exception('در این برد تسک دیگری با همین نام وجود دارد.');
 
-                        $pdo->prepare("UPDATE tasks SET name = ?, description = ?, status = ? WHERE id = ? AND board_id = ? AND project_id = ?")
-                            ->execute([$tName, $tDesc, $tStatus, $task_id, $board_id, $project_id]);
+                       $newBoardId = (int)($tData['board_id'] ?? $board_id);
+                       $chkBoard = $pdo->prepare("SELECT COUNT(*) FROM boards WHERE id = ? AND project_id = ?");
+                       $chkBoard->execute([$newBoardId, $project_id]);
+                       if ($chkBoard->fetchColumn() == 0) {
+                        throw new Exception('برد انتخاب‌شده معتبر نیست.');
+                    }
+
+                    $pdo->prepare("UPDATE tasks SET name = ?, description = ?, status = ?, board_id = ? 
+                    WHERE id = ? AND project_id = ?")
+                    ->execute([$tName, $tDesc, $tStatus, $newBoardId, $task_id, $project_id]);
+
 
                      
                         $pdo->prepare("DELETE FROM task_users WHERE task_id = ?")->execute([$task_id]);
@@ -246,6 +255,17 @@ if(empty($boardTasks)): ?>
 <?php endforeach; ?>
 </select>
 </div>
+<div class="field">
+    <label>برد مربوطه:</label>
+    <select name="tasks[<?= $b['id'] ?>][<?= $t['id'] ?>][board_id]" required>
+        <?php foreach($boards as $bb): ?>
+            <option value="<?= $bb['id'] ?>" <?= ($t['board_id']===$bb['id']?'selected':'') ?>>
+                <?= htmlspecialchars($bb['name']) ?>
+            </option>
+        <?php endforeach; ?>
+    </select>
+</div>
+
 
 
 <div class="field"><label>مسئولین تسک (حداکثر 5 نفر):</label>
