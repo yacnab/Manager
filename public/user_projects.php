@@ -3,9 +3,7 @@ require __DIR__ . '/../config/db.php';
 require __DIR__ . '/../includes/auth_check.php';
 enforceAccess('user_dashboard');
 
-
-
-
+$pdo->exec("SET SESSION sql_mode=(SELECT REPLACE(@@sql_mode,'ONLY_FULL_GROUP_BY',''))");
 
 $userId = $_SESSION['user_id'] ?? 0;
 if ($userId <= 0) {
@@ -13,13 +11,11 @@ if ($userId <= 0) {
     exit;
 }
 
-
 $projectId = $_GET['id'] ?? 0;
 if ($projectId <= 0) {
     echo "<h2 style='text-align:center;margin-top:20%;font-family:Tahoma;'>پروژه نامعتبر است.</h2>";
     exit;
 }
-
 
 $stmt = $pdo->prepare("SELECT * FROM projects WHERE id = ?");
 $stmt->execute([$projectId]);
@@ -31,11 +27,9 @@ if (!$project) {
 
 $pageTitle = $project['name'];
 
-
 $stmt = $pdo->prepare("SELECT * FROM boards WHERE project_id = ? ORDER BY id ASC");
 $stmt->execute([$projectId]);
 $boards = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
 
 $tasksByBoard = [];
 foreach ($boards as $board) {
@@ -54,7 +48,6 @@ foreach ($boards as $board) {
     $stmt->execute([$userId, $board['id']]);
     $tasksByBoard[$board['id']] = $stmt->fetchAll(PDO::FETCH_ASSOC);
 }
-
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['task_id'], $_POST['status'])) {
     $taskId = (int)$_POST['task_id'];
@@ -87,12 +80,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['task_id'], $_POST['st
         .board { background: #fff7c7; padding: 16px; border-radius: 12px; min-width: 280px; max-width: 280px; box-shadow: 0 4px 8px rgba(0,0,0,0.05); }
         .board h3 { margin-top: 0; font-size: 18px; color: #7a5600; }
         .board p.desc { font-size: 13px; color: #5c3d00; margin-bottom:10px; }
-        .task { background: #fff; padding: 10px; margin-bottom: 10px; border-radius: 10px; cursor: pointer; transition: box-shadow 0.2s; position: relative; }
+        .task { background: #fff; padding: 10px; margin-bottom: 10px; border-radius: 10px; cursor: grab; transition: box-shadow 0.2s; position: relative; }
         .task.done { text-decoration: line-through; opacity: 0.6; }
         .task:hover { box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
         .task select { position: absolute; bottom: 10px; left: 10px; }
         .assigned-users { font-size: 11px; color:#555; margin-top:5px; }
         .task-desc { font-size:12px; color:#444; margin-bottom:6px; }
+        .board.drag-over { background: #ffeaa7; }
     </style>
 </head>
 <body>
@@ -104,9 +98,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['task_id'], $_POST['st
         <?php if($project['description']): ?>
             <p style="color:#555;"><?= htmlspecialchars($project['description']) ?></p>
         <?php endif; ?>
-        <div class="boards-container">
+        <div class="boards-container" id="boardsRoot" data-project-id="<?= (int)$projectId ?>">
             <?php foreach($boards as $board): ?>
-                <div class="board">
+                <div class="board" data-board-id="<?= $board['id'] ?>">
                     <h3><?= htmlspecialchars($board['name']) ?></h3>
                     <?php if($board['description']): ?>
                         <p class="desc"><?= htmlspecialchars($board['description']) ?></p>
@@ -116,7 +110,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['task_id'], $_POST['st
                         $isOwner = ($task['user_id'] == $userId);
                         $doneClass = ($task['status'] === 'انجام شده') ? 'done' : '';
                         ?>
-                        <div class="task <?= $doneClass ?>">
+                        <div class="task <?= $doneClass ?>" draggable="true" data-task-id="<?= $task['id'] ?>">
                             <strong><?= htmlspecialchars($task['name']) ?></strong>
                             <?php if($task['description']): ?>
                                 <div class="task-desc"><?= htmlspecialchars($task['description']) ?></div>
@@ -141,5 +135,73 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['task_id'], $_POST['st
         </div>
     </div>
 </div>
+
+<script>
+
+const tasks = document.querySelectorAll(".task");
+const boards = document.querySelectorAll(".board");
+const boardsRoot = document.getElementById("boardsRoot");
+const projectId = boardsRoot ? boardsRoot.dataset.projectId : "";
+
+tasks.forEach(task => {
+    task.addEventListener("dragstart", e => {
+        e.dataTransfer.setData("taskId", task.dataset.taskId);
+        
+        e.dataTransfer.effectAllowed = "move";
+    });
+});
+
+boards.forEach(board => {
+    board.addEventListener("dragover", e => {
+        e.preventDefault();
+        board.classList.add("drag-over");
+        e.dataTransfer.dropEffect = "move";
+    });
+
+    board.addEventListener("dragleave", () => {
+        board.classList.remove("drag-over");
+    });
+
+    board.addEventListener("drop", e => {
+        e.preventDefault();
+        board.classList.remove("drag-over");
+
+        const taskId = e.dataTransfer.getData("taskId");
+        if (!taskId) return;
+
+        const taskElement = document.querySelector(`[data-task-id='${taskId}']`);
+        if (!taskElement) return;
+
+        
+        const oldParent = taskElement.parentElement;
+        
+        board.appendChild(taskElement);
+
+       
+        const params = new URLSearchParams();
+        params.append("task_id", taskId);
+        params.append("board_id", board.dataset.boardId);
+        params.append("project_id", projectId);
+
+        fetch("update_task_board.php", {
+            method: "POST",
+            headers: {"Content-Type": "application/x-www-form-urlencoded"},
+            body: params.toString()
+        })
+        .then(res => res.json().catch(() => ({})).then(data => ({ ok: res.ok, data })))
+        .then(({ ok, data }) => {
+            if (!ok || !data || data.status !== "OK") {
+                
+                if (oldParent) oldParent.appendChild(taskElement);
+                alert(data && data.message ? data.message : "بروزرسانی جابه‌جایی تسک در سرور ناموفق بود.");
+            }
+        })
+        .catch(() => {
+            if (oldParent) oldParent.appendChild(taskElement);
+            alert("عدم دسترسی به سرور برای ذخیره جابه‌جایی.");
+        });
+    });
+});
+</script>
 </body>
 </html>
